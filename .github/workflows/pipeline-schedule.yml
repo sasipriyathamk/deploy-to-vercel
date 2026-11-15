@@ -1,0 +1,86 @@
+# GitHub Actions schedules currently fail to start (startup_failure, likely Actions
+# billing). cron-job.org is the live scheduler and calls the same routes with
+# Authorization: Bearer CRON_SECRET. This file stays so a manual workflow_dispatch
+# still works, and so the schedule can be turned back on without rewriting it.
+#
+# 24/7 pipeline calls. GitHub cron is UTC. IST is UTC+5:30.
+#
+# These minutes do not overlap, and none of them land on :00, so poll, recheck,
+# and gains do not share the Helius keyed RPC minute (120 requests).
+#
+# - poll    every 10 min   UTC minutes 02/12/22/32/42/52
+#   IST minutes 32/42/52/02/12/22
+#   GET /api/cron/poll — Poll wallets, then drain the queue (~50s).
+# - recheck every 15 min   UTC minutes 05/20/35/50
+#   IST minutes 35/50/05/20
+#   GET /api/cron/recheck — drain due T0 / T5 / T15 / T60 jobs.
+#   This is the dashboard "Process queue" action.
+# - gains   every 15 min   UTC minutes 10/25/40/55
+#   IST minutes 40/55/10/25
+#   GET /api/cron/gains — Refresh gains.
+# - archive every 6 hours  UTC 00:17, 06:17, 12:17, 18:17
+#   IST 05:47, 11:47, 17:47, 23:47
+#   GET /api/cron/archive — archive thin markets and revive liquid ones.
+#
+# vercel.json stays once a day (Hobby limit) as a fallback, UTC:
+# poll 03:30, recheck 04:00, gains 04:30, archive 05:00
+# (IST 09:00, 09:30, 10:00, 10:30).
+#
+# Schedules run from the default branch only. workflow_dispatch can run one route
+# from this branch. Per-token Archive and Revive stay manual.
+#
+# Repository secrets:
+# - CRON_SECRET (required) — Authorization: Bearer
+# - APP_URL (optional) — defaults to https://sniper-wallet-tracker.vercel.app
+# - VERCEL_AUTOMATION_BYPASS_SECRET (optional) — sent as
+#   x-vercel-protection-bypass only when the secret is non-empty.
+#   The production alias currently reaches the app. Preview URLs redirect to Vercel SSO.
+
+name: Pipeline schedule
+
+on:
+  schedule:
+    - cron: "2,12,22,32,42,52 * * * *"
+    - cron: "5,20,35,50 * * * *"
+    - cron: "10,25,40,55 * * * *"
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Cron route to call
+        required: true
+        default: poll
+        type: choice
+        options:
+          - poll
+          - recheck
+          - gains
+          - archive
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keel-pipeline
+  cancel-in-progress: false
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Call production cron route
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          INPUT_JOB: ${{ inputs.job }}
+        run: .github/scripts/call-pipeline-cron.sh

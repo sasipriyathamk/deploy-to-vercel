@@ -1,0 +1,10 @@
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS first_alert_at timestamptz;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS first_alert_price_usd double precision;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS first_alert_mcap_usd double precision;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS confidence integer;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS confidence_pending integer;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS confidence_reasons jsonb;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS cap_regime text;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS alert_path jsonb;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS weak_rechecks integer NOT NULL DEFAULT 0;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS score_pending integer;

@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/poll",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/recheck",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/gains",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/archive",
+      "schedule": "0 5 * * *"
+    }
+  ]
+}
