@@ -162,7 +162,7 @@ async function acquireProvider(db: AppDb, provider: ProviderName): Promise<void>
     const slot = await reserveProviderSlot(db, gate, gap, MAX_INLINE_WAIT_MS);
     if (!slot.ok) throw new RateLimitError(provider, slot.retryAfterMs, slot.reason);
     if (slot.waitMs > 0) await sleep(slot.waitMs);
-    inFlight.set(gate, reserved + 1);
+    inFlight.set(gate, (inFlight.get(gate) ?? 0) + 1);
   });
 }
 

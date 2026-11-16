@@ -141,14 +141,15 @@ describe("poll backlog drain", () => {
       expect(result.failed).toBe(0);
       expect(result.pending).toBe(5);
       expect(fetches).toBe(0);
-      const rows = asRows<{ status: string; attempts: unknown; last_error: string | null }>(
-        await db.execute(sql`SELECT status, attempts, last_error FROM pipeline_jobs ORDER BY id`),
+      const rows = asRows<{ status: string; attempts: unknown; last_error: string | null; run_after: string | Date }>(
+        await db.execute(sql`SELECT status, attempts, last_error, run_after FROM pipeline_jobs ORDER BY id`),
       );
       expect(rows).toHaveLength(5);
       for (const row of rows) {
         expect(row.status).toBe("pending");
         expect(asNumber(row.attempts)).toBe(0);
         expect(row.last_error).toBeNull();
+        expect(new Date(row.run_after).getTime()).toBeGreaterThan(started);
       }
     } finally {
       await client.close();
