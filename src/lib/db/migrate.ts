@@ -32,7 +32,11 @@ export async function applyMigrations(db: Executor): Promise<string[]> {
   const fresh: string[] = [];
   for (const file of files) {
     if (applied.has(file)) continue;
-    if ((file === "0008_telegram_alerts.sql" || file === "0009_telegram_milestones.sql") && process.env.ALLOW_ALERT_MIGRATIONS !== "1") continue;
+    const isAlertMigration = file === "0008_telegram_alerts.sql" || file === "0009_telegram_milestones.sql";
+    const isPaperMigration = file === "0010_paper_trading.sql";
+    if (isAlertMigration && process.env.ALLOW_ALERT_MIGRATIONS !== "1") continue;
+    // Paper trading migration requires alert tables to exist first
+    if (isPaperMigration && process.env.ALLOW_ALERT_MIGRATIONS !== "1") continue;
     const text = fs.readFileSync(path.join(dir, file), "utf8");
     for (const statement of splitSql(text)) {
       await db.execute(sql.raw(statement));
