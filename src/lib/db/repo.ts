@@ -820,7 +820,7 @@ export async function watchingFreshness(db: AppDb) {
 
 export async function gainRefreshMints(db: AppDb, limit: number): Promise<string[]> {
   const result = await db.execute(sql`SELECT mint FROM tokens
-    WHERE status = 'watching'
+    WHERE status IN ('watching', 'candidate')
     ORDER BY last_checked_at ASC NULLS FIRST, score DESC, mint ASC
     LIMIT ${limit}`);
   return asRows<{ mint: string }>(result).map((row) => row.mint);
