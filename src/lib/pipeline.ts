@@ -90,8 +90,10 @@ import {
   getParsedTransaction,
   getSignatures,
   getTransaction,
+  loadGecko,
   loadMarket,
   loadRug,
+  lookupPublicMetadata,
   redactSecrets,
   tokenBalance,
   type RugReport,
@@ -1015,7 +1017,9 @@ export async function processQueue(db: AppDb, limit = 12, budgetMs = 8_000): Pro
 
 export async function drainQueue(db: AppDb, startedAt = Date.now()): Promise<QueueRun> {
   const deadline = startedAt + QUEUE_RUN_BUDGET_MS;
-  const queue = await processQueue(db, 12, Math.max(0, deadline - Date.now()));
+  // Reserve headroom for refreshGains and archive even when raw parse queue is backlogged
+  const queueTimeBudget = Math.max(0, Math.min(25_000, deadline - Date.now() - 15_000));
+  const queue = await processQueue(db, 12, queueTimeBudget);
   if (Date.now() + 1_500 < deadline) {
     try {
       queue.gains = await refreshGains(db, { limit: 200, deadline });
@@ -1047,6 +1051,15 @@ export async function runCron(db: AppDb, route: CronRoute) {
   try {
     if (route === "recheck") {
       const queue = await runRecheck(db, started);
+      queue.heldLease = true;
+      return { route, heldLease: true, polled: null, queue };
+    }
+    if (route === "gains") {
+      const deadline = started + 55_000;
+      const gains = await refreshGains(db, { limit: 200, deadline });
+      await flushAlerts(db, deadline);
+      const queue = await emptyQueueRun(db);
+      queue.gains = gains;
       queue.heldLease = true;
       return { route, heldLease: true, polled: null, queue };
     }
@@ -1146,6 +1159,38 @@ export async function refreshGains(
         }
       } catch {
         jupiterAvailable = false;
+      }
+    }
+    // Fallback to GeckoTerminal or public metadata for tokens still missing quotes:
+    if (canFetch()) {
+      const stillMissing = batchMints.filter(mint => positive(snaps.get(mint)?.priceUsd) == null && positive(snaps.get(mint)?.mcapUsd) == null);
+      for (const mint of stillMissing) {
+        if (!canFetch()) break;
+        try {
+          const gecko = await loadGecko(db, mint);
+          if (gecko && (positive(gecko.priceUsd) != null || positive(gecko.mcapUsd) != null)) {
+            snaps.set(mint, gecko);
+            continue;
+          }
+        } catch {
+          // continue to next fallback
+        }
+        try {
+          const meta = await lookupPublicMetadata(db, mint);
+          if (meta && (positive(meta.priceUsd) != null || positive(meta.mcapUsd) != null)) {
+            snaps.set(mint, {
+              ...emptySnapshot("metadata"),
+              priceUsd: meta.priceUsd,
+              mcapUsd: meta.mcapUsd,
+              symbol: meta.symbol,
+              name: meta.name,
+              imageUrl: meta.imageUrl,
+              observedAt: meta.observedAt ?? new Date().toISOString(),
+            });
+          }
+        } catch {
+          // ignore
+        }
       }
     }
     if (snaps.size === 0 && dexError && !dexLimited) throw dexError;

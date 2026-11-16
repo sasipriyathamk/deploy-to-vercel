@@ -20,6 +20,15 @@ function Workspace() {
     15000,
   );
   useEffect(() => {
+    // Periodically trigger a live gains refresh while the tab is active
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetch("/api/pipeline/gains", { method: "POST" }).catch(() => {});
+      }
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
     setTabCounts({
       watching: book.data?.total,
     });
@@ -50,7 +59,10 @@ function Workspace() {
         <button
           className="outline-control"
           disabled={book.loading}
-          onClick={() => void book.reload()}
+          onClick={async () => {
+            fetch("/api/pipeline/gains", { method: "POST" }).catch(() => {});
+            await book.reload();
+          }}
         >
           <RefreshCw size={15} className={book.loading ? "animate-spin" : ""} />{" "}
           Refresh
