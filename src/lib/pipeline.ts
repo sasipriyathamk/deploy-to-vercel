@@ -934,8 +934,7 @@ async function runClaimed(
       } catch (error) {
         if (error instanceof RateLimitError) {
           const retryAt = new Date(Date.now() + Math.max(0, error.retryAfterMs));
-          if (error.reason === "budget") await releaseJob(db, job.id);
-          else await deferJob(db, job.id, retryAt);
+          await deferJob(db, job.id, retryAt);
           tally(job.type, "released");
           released += 1;
           if ((error.provider === "rpc" || error.provider === "helius") && error.retryAfterMs >= 2_000) {
@@ -962,9 +961,11 @@ async function runClaimed(
   try {
     await Promise.all(Array.from({ length: workers }, () => worker()));
   } finally {
+    const deferUntil = stop ? new Date(Date.now() + 15_000) : null;
     for (const job of jobs) {
       if (handled.has(job.id)) continue;
-      await releaseJob(db, job.id);
+      if (deferUntil) await deferJob(db, job.id, deferUntil);
+      else await releaseJob(db, job.id);
       tally(job.type, "released");
       released += 1;
     }

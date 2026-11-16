@@ -51,7 +51,7 @@ export function minGapMs(provider: ProviderName): number {
       return 400;
     case "helius":
     case "rpc":
-      return process.env.HELIUS_API_KEY ? 120 : 400;
+      return process.env.HELIUS_API_KEY ? 500 : 400;
     default:
       return 0;
   }
