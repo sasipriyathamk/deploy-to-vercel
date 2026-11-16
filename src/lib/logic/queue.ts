@@ -1,15 +1,15 @@
-/** Lower runs first. Parse of new wallet txs, then T0, then due rechecks. */
+/** Lower runs first. Token discovery (enrich_t0) and rechecks run before the raw transaction backlog. */
 export function jobPriority(type: string): number {
   switch (type) {
-    case "parse":
-    case "parse_rpc":
-      return 0;
     case "enrich_t0":
-      return 1;
+      return 0;
     case "recheck_t5":
     case "recheck_t15":
-    case "recheck_t60":
+      return 1;
+    case "parse":
+    case "parse_rpc":
       return 2;
+    case "recheck_t60":
     case "hold_check":
       return 3;
     default:
@@ -18,12 +18,12 @@ export function jobPriority(type: string): number {
 }
 
 export const JOB_PRIORITY_SQL = `CASE type
-  WHEN 'parse' THEN 0
-  WHEN 'parse_rpc' THEN 0
-  WHEN 'enrich_t0' THEN 1
-  WHEN 'recheck_t5' THEN 2
-  WHEN 'recheck_t15' THEN 2
-  WHEN 'recheck_t60' THEN 2
+  WHEN 'enrich_t0' THEN 0
+  WHEN 'recheck_t5' THEN 1
+  WHEN 'recheck_t15' THEN 1
+  WHEN 'parse' THEN 2
+  WHEN 'parse_rpc' THEN 2
+  WHEN 'recheck_t60' THEN 3
   WHEN 'hold_check' THEN 3
   ELSE 9
 END`;

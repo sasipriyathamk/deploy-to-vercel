@@ -156,7 +156,7 @@ describe("poll backlog drain", () => {
     }
   });
 
-  it("claims parse jobs before T0 and due rechecks", async () => {
+  it("claims enrich and recheck jobs before raw parse backlog", async () => {
     const { client, db } = await openDb();
     try {
       const earlier = new Date(Date.now() - 60_000);
@@ -164,7 +164,7 @@ describe("poll backlog drain", () => {
       await enqueueJob(db, "enrich_t0", { mint: "mint-t0" }, earlier);
       await enqueueJob(db, "parse_rpc", { signature: "sig-new" }, new Date());
       const jobs = await claimJobs(db, 3);
-      expect(jobs.map((job) => job.type)).toEqual(["parse_rpc", "enrich_t0", "recheck_t5"]);
+      expect(jobs.map((job) => job.type)).toEqual(["enrich_t0", "recheck_t5", "parse_rpc"]);
     } finally {
       await client.close();
     }
